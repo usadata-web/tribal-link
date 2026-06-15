@@ -537,7 +537,15 @@ tr:hover td {
   *, *::before, *::after {
     -webkit-print-color-adjust: exact !important;
     print-color-adjust: exact !important;
+    /* box-shadow / gradient / filter make Chrome rasterize the element into an
+       image tile when printing — ~1 per shadowed box, which bloated the combined
+       PDF to 9 MB (6 MB of needless raster). Flatten them for print. */
+    box-shadow: none !important;
+    text-shadow: none !important;
+    filter: none !important;
   }
+  /* The one gradient (hero banner) -> flat fill so it doesn't rasterize. */
+  .hero, [style*="linear-gradient"] { background-image: none !important; }
   /* Site chrome is meaningless in a static document; drop nav + footer so they
      don't repeat on every printed sheet. */
   .site-nav, .site-footer { display: none !important; }

@@ -48,12 +48,13 @@
 </ol>
 <p>The dataset is then auto-classified along several axes (mindset, tier, function, vertical, program-alumni, military signal) and rolled up into a deep-dive report. The same pipeline runs for every tribe; only the input subsidiary list changes.</p>
 <p><b>Data currency.</b> The LinkedIn snapshots in the current edition were captured <b>May 19–29, 2026</b> (each tribe page shows its exact capture date in the header). People, titles, and tenures reflect public profiles as of that capture and may have changed since — this is a point-in-time snapshot, not a live feed. Federal spend figures come separately from USAspending.gov and cover FY25 to present.</p>
+<p><b>Data sourcing &amp; handling.</b> Inputs are limited to <b>publicly visible professional-profile information</b> and public federal-award records, used solely for <b>aggregate competitive analysis</b> of organizations. Individuals are not contacted, marketed to, or scored; data is retained only for the snapshot window. The broadly distributed edition is <b>role-and-tenure only, with individual names withheld</b> — the named version is held as an internal master and shared on a case-by-case basis.</p>
 </div>
 
 <h2 id="phase1">Phase 1 — LinkedIn discovery</h2>
 <div class="card">
 <h3>Job-title filters applied</h3>
-<p>The Phase 1 scan asks LinkedIn (via the Apify HarvestAPI actor) for everyone at each subsidiary whose title contains any of these growth-function terms:</p>
+<p>The Phase 1 scan asks (via a third-party public-profile data provider) for everyone at each subsidiary whose public title contains any of these growth-function terms:</p>
 <p><b>Core BD funnel:</b></p>
 <ul>
 <li><b>Business Development</b> (BD Director, BD Manager, VP BD, etc.)</li>
@@ -71,7 +72,7 @@
 <li><b>Bid Manager</b> / <b>Bids</b>, <b>Pursuit</b> / <b>Pursuits</b> (bid &amp; pursuit management)</li>
 <li><b>Partnerships</b>, <b>Alliances</b> (teaming / strategic partnerships)</li>
 </ul>
-<p class="small" style="color:#64748b">Plural forms (Proposals, Bids, Pursuits) are listed explicitly because HarvestAPI's title filter is word-boundary-based — the singular form does not match the plural. "Solutions Architecture" / pre-sales roles are surfaced but their inclusion in the BD funnel is still under cohort-wide review; "Pricing" hits are currently held aside pending a consistent cohort decision.</p>
+<p class="small" style="color:#64748b">Plural forms (Proposals, Bids, Pursuits) are listed explicitly because the provider's title filter is word-boundary-based — the singular form does not match the plural. "Solutions Architecture" / pre-sales roles are surfaced but their inclusion in the BD funnel is still under cohort-wide review; "Pricing" hits are currently held aside pending a consistent cohort decision.</p>
 
 <h3>Subsidiary list construction</h3>
 <p>For each tribe, the subsidiary list is built from:</p>
@@ -82,7 +83,7 @@
 </ol>
 
 <h3>Tool</h3>
-<p>Primary: <code>apify/harvestapi-linkedin-company-employees</code>. Fallback (when rate-limited): <code>apt_marble/linkedin-company-employees-scraper</code>.</p>
+<p>A third-party public-web profile-data provider returns the directory of company employees matching the title filter.</p>
 </div>
 
 <h2 id="phase2">Phase 2 — Profile enrichment</h2>
@@ -90,15 +91,14 @@
 <h3>What we extract per profile</h3>
 <ul>
 <li>Full name, headline, current company, location, education</li>
-<li>Complete work history with company, title, dates, duration, descriptions</li>
-<li>Connection count, follower count (signals for industry visibility)</li>
+<li>Work history with company, title, dates, duration (used for mindset/tenure classification)</li>
 </ul>
 
 <h3>Tool</h3>
-<p><code>apify/apimaestro-linkedin-profile-detail</code>. HarvestAPI tracking IDs from Phase 1 can be passed directly as the <code>username</code> parameter — no need to resolve public usernames first.</p>
+<p>A third-party public-web profile-detail provider returns the structured work-history record for each Phase-1 hit.</p>
 
 <h3>Consolidation</h3>
-<p>All Phase 2 datasets across all Apify runs are pulled via REST API, deduplicated by LinkedIn username, and slimmed to a per-profile JSON containing only the fields needed for analysis (no avatars, no banner images, no engagement noise).</p>
+<p>Profile datasets are deduplicated by profile identifier and slimmed to a per-profile JSON containing only the fields needed for analysis (no photos, no engagement metrics).</p>
 </div>
 
 <h2 id="validation">Validation & confidence scoring</h2>
@@ -125,7 +125,7 @@
 <ul>
 <li><b>Company-name collisions</b> — multiple unrelated companies share a name (e.g., Seneca Resources is an oil &amp; gas company, NOT Seneca Nation; Pinnacle Solutions has multiple unrelated entities)</li>
 <li><b>LinkedIn lag</b> — departed employees whose profile still lists the old company</li>
-<li><b>Past-role matches</b> — HarvestAPI returns people with matching past experience even though their current role is elsewhere</li>
+<li><b>Past-role matches</b> — the data provider returns people with matching past experience even though their current role is elsewhere</li>
 <li><b>Generic title at a non-BD function</b> — "Director" or "VP" without a function keyword captured by mistake</li>
 </ul>
 
@@ -136,7 +136,7 @@
 <p>Profiles with no current_company set (empty/null) are dropped — they can't be verified.</p>
 
 <h3>Manual additions</h3>
-<p>Some legitimate BD-leadership people have LinkedIn profiles too general for the title filter to catch (e.g. an "Executive Vice President" of a federal-services holding company — no BD/Capture/Sales/etc. keyword in the title or headline). These are added via per-tribe <code>manual_additions</code> in the config and enriched separately via apimaestro.</p>
+<p>Some legitimate BD-leadership people have LinkedIn profiles too general for the title filter to catch (e.g. an "Executive Vice President" of a federal-services holding company — no BD/Capture/Sales/etc. keyword in the title or headline). These are added via per-tribe <code>manual_additions</code> in the config and enriched separately.</p>
 
 <h3>Per-tribe function overrides</h3>
 <p>Different tribes use the same title to mean different things. Cherokee Federal's "Account Executive" title, for example, is an agency-relationship BD role (HHS/CDC, Defense Health, Navy, etc.) — structurally a BD-funnel role, not a product-seller. The generic title classifier maps "account executive" to Sales/Account, which is the right default for tribes with real product motion (Akima's Affigent, Goldbelt's tactical gear) but wrong for Cherokee where the same title means something different.</p>
@@ -145,6 +145,7 @@
 
 <h2 id="classification">Auto-classification</h2>
 <div class="card">
+<p class="small" style="background:#fffbeb;border:1px solid #fde68a;color:#92400e;padding:8px 14px;border-radius:8px;margin:0 0 14px"><b>Individual-level caveat.</b> Mindset labels (LARGE / SMALL / ANC / GOVT / INTERNAL) are <b>automated keyword inferences</b> from public prior-employer text and may be wrong for any given person; prior-employer matches can be company-name collisions; tenure reflects the LinkedIn snapshot and may include role changes. Per-person cells are illustrative of cohort-level patterns, <b>not verified individual assessments</b>, and "strategic value" notes are analyst inference about role-based capability, not claims about any individual's conduct.</p>
 <h3>Mindset (prior-employer type)</h3>
 <p>Each person is auto-classified into one of five mindset buckets based on prior-employer keyword matches:</p>
 <ul>
@@ -233,7 +234,7 @@
 <p>"Services capture productivity per BD-funnel staffer" = a tribe's annual services run-rate divided by its audited BD-funnel headcount. It is a structural signal of operating model — high = a mature book run by a thin bench; low = a pursuit-heavy book carried by a thick bench — <b>not</b> a performance grade.</p>
 
 <h3>Annualization basis: FY25 only</h3>
-<p>The rate uses <b>FY25 only</b> (the most recent complete federal fiscal year), not the FY25+FY26 window the portfolio totals span. FY26 is only partially posted at extract time and the posted share varies per tribe, so a flat "20-month &divide; 12" annualizer understated the run-rate unevenly (worse for some tribes than others). FY25 is fully closed and posted, so it is the clean basis. <b>Window caveat:</b> FY25 was a <i>down</i> year vs FY24 for several broad-coverage tribes (ASRC, Chenega, Cherokee, Seneca), which deepens their floor placement; a FY24–FY25 view would lift them somewhat but does not change the tiering.</p>
+<p>The rate uses <b>FY25 only</b> (the most recent complete federal fiscal year), not the FY25+FY26 window the portfolio totals span. FY26 is only partially posted at extract time and the posted share varies per tribe, so a flat "20-month &divide; 12" annualizer understated the run-rate unevenly (worse for some tribes than others). FY25 is fully closed and posted, so it is the clean basis. <b>Window caveat (window-sensitive at the boundary):</b> FY25 was a <i>down</i> year vs FY24 for several broad-coverage tribes (ASRC −45%, Chenega −32%, Cherokee −27%, Seneca −38%), so the FY25 run-rate depresses exactly those tribes. The three-tier band structure holds under a two-year FY24–FY25 view, but single-position ordering at the Tier-2/Tier-3 boundary is window-sensitive — ASRC's band in particular rises toward the boundary on a two-year basis. We use FY25-only as the primary basis because it is the one fully-closed fiscal year; read ASRC/Akima as floor-or-low-mid, not a fixed rank.</p>
 
 <h3>Why bands and tiers, not point ranks</h3>
 <p>The denominator (BD-funnel staff) is a <b>LinkedIn-derived lower bound</b> — see the calibration anchor under Known Limitations. So a point estimate is an <i>upper</i> bound on productivity. We therefore present a <b>capture-adjusted band</b> (point estimate &times; a plausible capture-rate range) and group tribes into three tiers — <i>specialty leader</i>, <i>efficient mid-tier</i>, <i>broad-coverage floor</i> — rather than a spurious 1–11 ranking. The tiers are robust; single-position ordering <i>within</i> the mid-tier is not, because the bands overlap.</p>
@@ -242,7 +243,7 @@
 <ul>
 <li><b>Measured:</b> Chenega ~85%, Koniag ~87% (full directory scanned, below the cap); ~82% ground-truth calibration at one tribe.</li>
 <li><b>Modeled ~78–90%</b> for the other small tribes (directory below the scan cap).</li>
-<li><b>45–90% for the three capped tribes</b> (ASRC, Akima, Cherokee), whose LinkedIn directory exceeds HarvestAPI's ~2,500-profile scan ceiling. The low end is a deliberately pessimistic floor.</li>
+<li><b>45–90% for the three capped tribes</b> (ASRC, Akima, Cherokee), whose LinkedIn directory exceeds the provider's ~2,500-profile scan ceiling. The low end is a deliberately pessimistic floor.</li>
 </ul>
 
 <h3>Honest limitations of the capture model</h3>
@@ -288,20 +289,8 @@
 <li><b>Monthly</b> — Re-run USAspending data load (Microsoft Fabric pipeline). Updates federal trajectory.</li>
 <li><b>Every 60-90 days</b> — Re-run Phase 1 LinkedIn scans across all 11 tribes. Surfaces: departures from the current bench, new hires not yet captured, promotions / title changes, cross-ANC talent moves.</li>
 <li><b>Every 60 days</b> — Run the tribal-research agent (Tavily + RSS) for acquisitions, personnel, and major contract vehicle wins.</li>
-<li><b>Each refresh</b> — Snapshot the site (preserves comparison points). See "Historical snapshots" below.</li>
+<li><b>Each refresh</b> — Snapshot the site internally (preserves comparison points for diffing bench composition + bookings over time). Snapshots are an internal working artifact and are not part of any distributed edition.</li>
 </ol>
-</div>
-
-<h2 id="snapshots">Historical snapshots</h2>
-<div class="card">
-<p>Each refresh creates a dated snapshot at <code>site/snapshots/YYYY-MM-DD/</code>, preserving the full deep-dive set + comparative pages for that point in time. This enables:</p>
-<ul>
-<li>Diffing BD bench composition over time (who joined / left / got promoted)</li>
-<li>Watching federal bookings trajectory updates</li>
-<li>Tracking the "category label" transitions (e.g., a tribe moving from variable to cliff-FY26)</li>
-<li>Defending claims like "X has been quietly investing in the DLA vertical for 18 months" with date-stamped data</li>
-</ul>
-<p>Snapshot directories are not navigable through the live nav; they're referenced by date in comparative analysis pages.</p>
 </div>
 
 <h2 id="limitations">Known limitations</h2>
